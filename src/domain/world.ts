@@ -41,6 +41,17 @@ export function setBlock(world: StarterWorld, pos: BlockPos, block: BlockId): vo
   world.edits.set(blockKey(pos), block);
 }
 
+export function serializeEdits(world: StarterWorld): [string, BlockId][] {
+  return Array.from(world.edits.entries());
+}
+
+export function applyEdits(world: StarterWorld, edits: [string, BlockId][]): void {
+  world.edits.clear();
+  for (const [key, block] of edits) {
+    world.edits.set(key, block);
+  }
+}
+
 export function isSolidAt(world: StarterWorld, pos: BlockPos): boolean {
   return isSolid(getBlock(world, pos));
 }

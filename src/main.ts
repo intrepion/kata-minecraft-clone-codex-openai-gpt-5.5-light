@@ -16,6 +16,8 @@ declare global {
       selectHotbar: (slot: number) => void;
       blockAt: (pos: import("./domain/world").BlockPos) => import("./domain/blocks").BlockId;
       placeAt: (pos: import("./domain/world").BlockPos) => boolean;
+      save: () => void;
+      clearSave: () => void;
     };
   }
 }

@@ -23,6 +23,13 @@ import {
   makeSurvivalState,
   respawnPosition
 } from "./domain/survival";
+import {
+  applySave,
+  loadFromStorage,
+  makeSave,
+  SAVE_KEY,
+  saveToStorage
+} from "./domain/persistence";
 import { buildChunkMesh } from "./render/chunkMesh";
 import { makePlayer, updatePlayer, type InputState } from "./game/player";
 import { raycastBlock, type TargetHit } from "./game/targeting";
@@ -48,6 +55,7 @@ export function mountBlockstead(root: HTMLElement): void {
             <div>Mining <strong id="mining">idle</strong></div>
             <div>Time <strong id="time">day</strong></div>
             <div>Protection <strong id="protection">exposed</strong></div>
+            <div>Save <strong id="save-state">unsaved</strong></div>
             <div>Mode <strong>Slice 1</strong></div>
           </dl>
         </section>
@@ -69,6 +77,8 @@ export function mountBlockstead(root: HTMLElement): void {
   const survival = makeSurvivalState();
   addItem(inventory, "dirt", 4);
   const player = makePlayer(findSpawn(world));
+  const saved = loadFromStorage(localStorage);
+  if (saved) applySave(saved, world, player, inventory, survival);
   const input: InputState = { forward: false, backward: false, left: false, right: false, jump: false };
   const pointer = { mining: false };
   const scene = new THREE.Scene();
@@ -105,6 +115,7 @@ export function mountBlockstead(root: HTMLElement): void {
   const mining = root.querySelector<HTMLElement>("#mining");
   const time = root.querySelector<HTMLElement>("#time");
   const protection = root.querySelector<HTMLElement>("#protection");
+  const saveState = root.querySelector<HTMLElement>("#save-state");
   const hotbar = root.querySelector<HTMLElement>("#hotbar");
   const recipes = root.querySelector<HTMLElement>("#recipes");
   let last = performance.now();
@@ -177,6 +188,7 @@ export function mountBlockstead(root: HTMLElement): void {
     if (mining) mining.textContent = miningProgress > 0 ? `${Math.round(miningProgress * 100)}%` : "idle";
     if (time) time.textContent = isNight(survival.timeOfDay) ? "night" : "day";
     if (protection) protection.textContent = isProtected(world, player.position) ? "protected" : "exposed";
+    if (saveState) saveState.textContent = localStorage.getItem(SAVE_KEY) ? "saved" : "unsaved";
     renderHotbar(hotbar, inventory);
     renderRecipes(recipes, inventory);
     renderer.render(scene, camera);
@@ -228,7 +240,9 @@ export function mountBlockstead(root: HTMLElement): void {
       inventory.selected = Math.max(0, Math.min(inventory.hotbar.length - 1, slot));
     },
     blockAt: (pos: BlockPos) => getBlock(world, pos),
-    placeAt: (pos: BlockPos) => placeSelectedAt(pos)
+    placeAt: (pos: BlockPos) => placeSelectedAt(pos),
+    save: () => saveToStorage(localStorage, makeSave(world, player, inventory, survival)),
+    clearSave: () => localStorage.removeItem(SAVE_KEY)
   };
 
   function tickMining(dt: number): void {
