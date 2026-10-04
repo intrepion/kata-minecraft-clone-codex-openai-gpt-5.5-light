@@ -44,6 +44,10 @@ _Avoid_: Range, interaction distance
 The time required to mine a Resource Block, based on the block and currently held tool.
 _Avoid_: Mining speed, harvest delay
 
+**Tool Tier**:
+The progression level of a held tool that affects Break Time and whether certain Resource Blocks can be gathered efficiently.
+_Avoid_: Equipment level, harvest tier
+
 **Survival Spine**:
 The minimum playable structure that makes shelter and resource gathering matter: health, fall damage, day/night progression, and a simple night threat.
 _Avoid_: Survival mode, combat mode
@@ -55,6 +59,10 @@ _Avoid_: Mob system, enemy AI
 **Shadow Pressure**:
 The first Night Threat: darkness and exposure drain player health unless the player is protected by torchlight or sufficient shelter.
 _Avoid_: Monster attack, darkness damage
+
+**Protection Check**:
+The MVP rule that determines whether Shadow Pressure is blocked by nearby torchlight or sufficient shelter.
+_Avoid_: Safety test, shelter detection
 
 **Shelter**:
 A player-built enclosed or protected space that helps the player survive night pressure.
@@ -80,6 +88,10 @@ _Avoid_: Inventory grid, bag
 The MVP crafting interface where available recipes are selected directly from known inputs rather than assembled in a spatial crafting grid.
 _Avoid_: Crafting grid, recipe book
 
+**Drop Rule**:
+The rule that converts a mined block into a carried item or nothing.
+_Avoid_: Loot rule, harvest output
+
 **Torch**:
 A placed light source used to make darkness legible and support safe shelter during the night.
 _Avoid_: Light, lamp
@@ -95,3 +107,7 @@ _Avoid_: Death reset, reload, revive
 **Local World Save**:
 The browser-persisted state containing player position, inventory, and Block Edits across reloads.
 _Avoid_: Save game, profile, checkpoint
+
+**Test Mode**:
+The deterministic browser-test contract that exposes controlled hooks for time, inventory, health, player position, and world snapshots.
+_Avoid_: Debug mode, dev mode, cheat mode
