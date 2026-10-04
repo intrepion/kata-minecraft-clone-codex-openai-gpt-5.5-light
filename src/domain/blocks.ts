@@ -6,7 +6,6 @@ export type BlockId =
   | "log"
   | "leaves"
   | "coalOre"
-  | "water"
   | "plank"
   | "craftingTable"
   | "torch";
@@ -27,7 +26,6 @@ export const BLOCKS: Record<BlockId, BlockDefinition> = {
   log: { id: "log", solid: true, color: 0x7a5431, breakTime: 0.9, placeable: true },
   leaves: { id: "leaves", solid: true, color: 0x3f7a3f, breakTime: 0.35, placeable: false },
   coalOre: { id: "coalOre", solid: true, color: 0x555550, breakTime: 1.9, placeable: false },
-  water: { id: "water", solid: false, color: 0x446f9d, breakTime: 0, placeable: false },
   plank: { id: "plank", solid: true, color: 0xb4874f, breakTime: 0.55, placeable: true },
   craftingTable: { id: "craftingTable", solid: true, color: 0x9b7042, breakTime: 0.65, placeable: true },
   torch: { id: "torch", solid: false, color: 0xf6bd4a, breakTime: 0.2, placeable: true }

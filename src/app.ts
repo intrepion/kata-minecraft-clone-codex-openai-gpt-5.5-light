@@ -56,7 +56,7 @@ export function mountBlockstead(root: HTMLElement): void {
             <div>Time <strong id="time">day</strong></div>
             <div>Protection <strong id="protection">exposed</strong></div>
             <div>Save <strong id="save-state">unsaved</strong></div>
-            <div>Mode <strong>Slice 1</strong></div>
+            <div>Mode <strong>MVP</strong></div>
           </dl>
         </section>
         <section class="recipes">
@@ -133,6 +133,11 @@ export function mountBlockstead(root: HTMLElement): void {
     if (event.button === 0) pointer.mining = true;
     if (event.button === 2) placeSelected();
   });
+  recipes?.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-recipe]");
+    if (!button) return;
+    craftWithWorld(button.dataset.recipe as RecipeId);
+  });
   window.addEventListener("mouseup", (event) => {
     if (event.button === 0) {
       pointer.mining = false;
@@ -165,11 +170,7 @@ export function mountBlockstead(root: HTMLElement): void {
     if (nextHealth < player.health) playCue("damage");
     player.health = nextHealth;
     if (player.health <= 0) {
-      player.position = respawnPosition(world);
-      player.velocityY = 0;
-      player.health = 20;
-      survival.respawns += 1;
-      playCue("respawn");
+      respawnPlayer();
     }
     camera.position.set(player.position.x, player.position.y + 1.62, player.position.z);
     camera.rotation.order = "YXZ";
@@ -190,7 +191,7 @@ export function mountBlockstead(root: HTMLElement): void {
     if (protection) protection.textContent = isProtected(world, player.position) ? "protected" : "exposed";
     if (saveState) saveState.textContent = localStorage.getItem(SAVE_KEY) ? "saved" : "unsaved";
     renderHotbar(hotbar, inventory);
-    renderRecipes(recipes, inventory);
+    renderRecipes(recipes, inventory, hasPlacedCraftingTable());
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -214,8 +215,8 @@ export function mountBlockstead(root: HTMLElement): void {
     mineTarget,
     placeSelected,
     give: (item: ItemId, amount = 1) => addItem(inventory, item, amount),
-    craft: (recipe: RecipeId) => craft(inventory, recipe),
-    canCraft: (recipe: RecipeId) => canCraft(inventory, recipe),
+    craft: craftWithWorld,
+    canCraft: (recipe: RecipeId) => canCraft(inventory, recipe, hasPlacedCraftingTable()),
     setTimeOfDay: (timeOfDay: number) => {
       survival.timeOfDay = ((timeOfDay % 1) + 1) % 1;
     },
@@ -230,10 +231,7 @@ export function mountBlockstead(root: HTMLElement): void {
       advanceDayCycle(survival, dt);
       player.health = applyShadowPressure(world, player.position, player.health, survival.timeOfDay, dt);
       if (player.health <= 0) {
-        player.position = respawnPosition(world);
-        player.health = 20;
-        survival.respawns += 1;
-        playCue("respawn");
+        respawnPlayer();
       }
     },
     selectHotbar: (slot: number) => {
@@ -257,7 +255,7 @@ export function mountBlockstead(root: HTMLElement): void {
       miningProgress = 0;
     }
     const block = getBlock(world, currentTarget.block);
-    const breakTime = BLOCKS[block].breakTime;
+    const breakTime = effectiveBreakTime(block);
     if (breakTime <= 0) return;
     miningProgress += dt / breakTime;
     if (miningProgress >= 1) {
@@ -271,11 +269,45 @@ export function mountBlockstead(root: HTMLElement): void {
     if (!currentTarget) return false;
     const block = getBlock(world, currentTarget.block);
     if (block === "air") return false;
-    const drop = dropForBlock(block);
+    const drop = canHarvest(block) ? dropForBlock(block) : null;
     setBlock(world, currentTarget.block, "air");
     if (drop) addItem(inventory, drop);
     playCue("break");
     rebuildChunkFor(currentTarget.block);
+    return true;
+  }
+
+  function craftWithWorld(recipe: RecipeId): boolean {
+    return craft(inventory, recipe, hasPlacedCraftingTable());
+  }
+
+  function hasPlacedCraftingTable(): boolean {
+    for (let x = Math.floor(player.position.x) - 4; x <= Math.floor(player.position.x) + 4; x += 1) {
+      for (let y = Math.floor(player.position.y) - 2; y <= Math.floor(player.position.y) + 3; y += 1) {
+        for (let z = Math.floor(player.position.z) - 4; z <= Math.floor(player.position.z) + 4; z += 1) {
+          if (getBlock(world, { x, y, z }) === "craftingTable") return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function selectedItem(): ItemId | null {
+    return inventory.hotbar[inventory.selected] ?? null;
+  }
+
+  function effectiveBreakTime(block: BlockId): number {
+    const base = BLOCKS[block].breakTime;
+    const item = selectedItem();
+    if ((block === "stone" || block === "coalOre") && item === "stonePickaxe") return base * 0.38;
+    if ((block === "stone" || block === "coalOre") && item === "woodPickaxe") return base * 0.62;
+    if (block === "stone" || block === "coalOre") return base * 3.5;
+    return base;
+  }
+
+  function canHarvest(block: BlockId): boolean {
+    const item = selectedItem();
+    if (block === "stone" || block === "coalOre") return item === "woodPickaxe" || item === "stonePickaxe";
     return true;
   }
 
@@ -336,6 +368,14 @@ export function mountBlockstead(root: HTMLElement): void {
     oscillator.start();
     oscillator.stop(audioContext.currentTime + 0.14);
   }
+
+  function respawnPlayer(): void {
+    player.position = respawnPosition(world);
+    player.velocityY = 0;
+    player.health = 20;
+    survival.respawns += 1;
+    playCue("respawn");
+  }
 }
 
 function createChunkObject(world: ReturnType<typeof makeStarterWorld>, chunkX: number, chunkZ: number): THREE.Mesh {
@@ -382,14 +422,14 @@ function renderHotbar(host: HTMLElement | null, inventory: Inventory): void {
     .join("");
 }
 
-function renderRecipes(host: HTMLElement | null, inventory: Inventory): void {
+function renderRecipes(host: HTMLElement | null, inventory: Inventory, hasCraftingTable: boolean): void {
   if (!host) return;
   host.innerHTML = RECIPES.map((recipe) => {
-    const affordable = canCraft(inventory, recipe.id);
+    const affordable = canCraft(inventory, recipe.id, hasCraftingTable);
     const cost = Object.entries(recipe.inputs)
       .map(([item, amount]) => `${amount} ${item}`)
       .join(", ");
-    return `<button class="recipe" data-affordable="${affordable}" disabled>${recipe.label}<span>${cost}</span></button>`;
+    return `<button class="recipe" data-recipe="${recipe.id}" data-affordable="${affordable}">${recipe.label}<span>${cost}</span></button>`;
   }).join("");
 }
 

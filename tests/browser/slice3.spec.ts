@@ -15,11 +15,24 @@ test("Slice 3 crafts resource progression recipes and shows unaffordable state",
     window.__blockstead?.craft("sticks");
     window.__blockstead?.give("plank", 4);
     window.__blockstead?.craft("craftingTable");
+  });
+  const tableSlot = await page.evaluate(() => window.__blockstead?.snapshot().inventory.hotbar.indexOf("craftingTable") ?? -1);
+  await page.evaluate((slot) => {
+    window.__blockstead?.selectHotbar(slot);
+    window.__blockstead?.placeAt({ x: 1, y: 11, z: -1 });
+  }, tableSlot);
+  await page.evaluate(() => {
     window.__blockstead?.give("plank", 3);
     window.__blockstead?.give("stick", 2);
   });
 
-  const craftedPick = await page.evaluate(() => window.__blockstead?.craft("woodPickaxe"));
+  const craftedPick = await page.evaluate(() => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>("[data-recipe]")].find(
+      (entry) => entry.dataset.recipe === "woodPickaxe"
+    );
+    button?.click();
+    return window.__blockstead?.snapshot().inventory.counts.woodPickaxe === 1;
+  });
   const snapshot = await page.evaluate(() => window.__blockstead?.snapshot());
 
   expect(craftedPick).toBe(true);

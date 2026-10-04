@@ -117,14 +117,14 @@ export function consumeSelected(inventory: Inventory): ItemId | null {
   return item;
 }
 
-export function canCraft(inventory: Inventory, recipeId: RecipeId): boolean {
+export function canCraft(inventory: Inventory, recipeId: RecipeId, hasCraftingTable = false): boolean {
   const recipe = findRecipe(recipeId);
-  if (recipe.requiresTable && inventory.counts.craftingTable <= 0) return false;
+  if (recipe.requiresTable && !hasCraftingTable) return false;
   return Object.entries(recipe.inputs).every(([item, amount]) => inventory.counts[item as ItemId] >= amount);
 }
 
-export function craft(inventory: Inventory, recipeId: RecipeId): boolean {
-  if (!canCraft(inventory, recipeId)) return false;
+export function craft(inventory: Inventory, recipeId: RecipeId, hasCraftingTable = false): boolean {
+  if (!canCraft(inventory, recipeId, hasCraftingTable)) return false;
   const recipe = findRecipe(recipeId);
   for (const [item, amount] of Object.entries(recipe.inputs)) {
     inventory.counts[item as ItemId] -= amount;

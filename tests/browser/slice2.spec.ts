@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { collectPageErrors } from "./helpers";
 
 test("Slice 2 mines and places blocks with visible world edits", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = collectPageErrors(page);
 
   await page.goto("/app.html");
   await expect.poll(async () => page.evaluate(() => window.__blockstead?.snapshot().target !== null)).toBe(true);

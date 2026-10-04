@@ -1,11 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { collectPageErrors } from "./helpers";
 
 test("Slice 1 boots a rendered Starter Valley with movement and target face", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = collectPageErrors(page);
 
   await page.goto("/app.html");
   await expect(page.locator("canvas")).toBeVisible();

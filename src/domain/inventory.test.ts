@@ -30,8 +30,8 @@ describe("Drop Rules and Hotbar", () => {
 
     addItem(inventory, "plank", 5);
     expect(craft(inventory, "sticks")).toBe(true);
-    expect(canCraft(inventory, "woodPickaxe")).toBe(true);
-    expect(craft(inventory, "woodPickaxe")).toBe(true);
+    expect(canCraft(inventory, "woodPickaxe", true)).toBe(true);
+    expect(craft(inventory, "woodPickaxe", true)).toBe(true);
     expect(inventory.counts.woodPickaxe).toBe(1);
   });
 });

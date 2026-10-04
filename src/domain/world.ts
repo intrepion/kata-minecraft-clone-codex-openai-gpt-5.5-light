@@ -73,8 +73,9 @@ export function generatedBlock(seed: number, pos: BlockPos): BlockId {
   const height = surfaceHeight(seed, pos.x, pos.z);
   const caveMouth = pos.x >= -12 && pos.x <= -5 && pos.z >= 4 && pos.z <= 10 && pos.y >= 4 && pos.y <= 7;
   if (caveMouth) return "air";
-  if (treeBlock(pos, seed) === "log") return "log";
-  if (treeBlock(pos, seed) === "leaves") return "leaves";
+  const tree = treeBlock(pos, seed);
+  if (tree === "log") return "log";
+  if (tree === "leaves") return "leaves";
   if (pos.y > height) return "air";
   if (pos.y === height) return "grass";
   if (pos.y > height - 3) return "dirt";

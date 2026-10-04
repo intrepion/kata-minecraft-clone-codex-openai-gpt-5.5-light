@@ -25283,7 +25283,6 @@ void main() {
     log: { id: "log", solid: true, color: 8016945, breakTime: 0.9, placeable: true },
     leaves: { id: "leaves", solid: true, color: 4160063, breakTime: 0.35, placeable: false },
     coalOre: { id: "coalOre", solid: true, color: 5592400, breakTime: 1.9, placeable: false },
-    water: { id: "water", solid: false, color: 4485021, breakTime: 0, placeable: false },
     plank: { id: "plank", solid: true, color: 11831119, breakTime: 0.55, placeable: true },
     craftingTable: { id: "craftingTable", solid: true, color: 10186818, breakTime: 0.65, placeable: true },
     torch: { id: "torch", solid: false, color: 16170314, breakTime: 0.2, placeable: true }
@@ -25336,8 +25335,9 @@ void main() {
     const height = surfaceHeight(seed, pos.x, pos.z);
     const caveMouth = pos.x >= -12 && pos.x <= -5 && pos.z >= 4 && pos.z <= 10 && pos.y >= 4 && pos.y <= 7;
     if (caveMouth) return "air";
-    if (treeBlock(pos, seed) === "log") return "log";
-    if (treeBlock(pos, seed) === "leaves") return "leaves";
+    const tree = treeBlock(pos, seed);
+    if (tree === "log") return "log";
+    if (tree === "leaves") return "leaves";
     if (pos.y > height) return "air";
     if (pos.y === height) return "grass";
     if (pos.y > height - 3) return "dirt";
@@ -25466,13 +25466,13 @@ void main() {
     inventory.counts[item] -= 1;
     return item;
   }
-  function canCraft(inventory, recipeId) {
+  function canCraft(inventory, recipeId, hasCraftingTable = false) {
     const recipe = findRecipe(recipeId);
-    if (recipe.requiresTable && inventory.counts.craftingTable <= 0) return false;
+    if (recipe.requiresTable && !hasCraftingTable) return false;
     return Object.entries(recipe.inputs).every(([item, amount]) => inventory.counts[item] >= amount);
   }
-  function craft(inventory, recipeId) {
-    if (!canCraft(inventory, recipeId)) return false;
+  function craft(inventory, recipeId, hasCraftingTable = false) {
+    if (!canCraft(inventory, recipeId, hasCraftingTable)) return false;
     const recipe = findRecipe(recipeId);
     for (const [item, amount] of Object.entries(recipe.inputs)) {
       inventory.counts[item] -= amount;
@@ -25740,7 +25740,7 @@ void main() {
             <div>Time <strong id="time">day</strong></div>
             <div>Protection <strong id="protection">exposed</strong></div>
             <div>Save <strong id="save-state">unsaved</strong></div>
-            <div>Mode <strong>Slice 1</strong></div>
+            <div>Mode <strong>MVP</strong></div>
           </dl>
         </section>
         <section class="recipes">
@@ -25811,6 +25811,11 @@ void main() {
       if (event.button === 0) pointer.mining = true;
       if (event.button === 2) placeSelected();
     });
+    recipes?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-recipe]");
+      if (!button) return;
+      craftWithWorld(button.dataset.recipe);
+    });
     window.addEventListener("mouseup", (event) => {
       if (event.button === 0) {
         pointer.mining = false;
@@ -25842,11 +25847,7 @@ void main() {
       if (nextHealth < player.health) playCue("damage");
       player.health = nextHealth;
       if (player.health <= 0) {
-        player.position = respawnPosition(world);
-        player.velocityY = 0;
-        player.health = 20;
-        survival.respawns += 1;
-        playCue("respawn");
+        respawnPlayer();
       }
       camera.position.set(player.position.x, player.position.y + 1.62, player.position.z);
       camera.rotation.order = "YXZ";
@@ -25865,7 +25866,7 @@ void main() {
       if (protection) protection.textContent = isProtected(world, player.position) ? "protected" : "exposed";
       if (saveState) saveState.textContent = localStorage.getItem(SAVE_KEY) ? "saved" : "unsaved";
       renderHotbar(hotbar, inventory);
-      renderRecipes(recipes, inventory);
+      renderRecipes(recipes, inventory, hasPlacedCraftingTable());
       renderer.render(scene, camera);
       requestAnimationFrame(frame);
     }
@@ -25888,8 +25889,8 @@ void main() {
       mineTarget,
       placeSelected,
       give: (item, amount = 1) => addItem(inventory, item, amount),
-      craft: (recipe) => craft(inventory, recipe),
-      canCraft: (recipe) => canCraft(inventory, recipe),
+      craft: craftWithWorld,
+      canCraft: (recipe) => canCraft(inventory, recipe, hasPlacedCraftingTable()),
       setTimeOfDay: (timeOfDay) => {
         survival.timeOfDay = (timeOfDay % 1 + 1) % 1;
       },
@@ -25904,10 +25905,7 @@ void main() {
         advanceDayCycle(survival, dt);
         player.health = applyShadowPressure(world, player.position, player.health, survival.timeOfDay, dt);
         if (player.health <= 0) {
-          player.position = respawnPosition(world);
-          player.health = 20;
-          survival.respawns += 1;
-          playCue("respawn");
+          respawnPlayer();
         }
       },
       selectHotbar: (slot) => {
@@ -25930,7 +25928,7 @@ void main() {
         miningProgress = 0;
       }
       const block = getBlock(world, currentTarget.block);
-      const breakTime = BLOCKS[block].breakTime;
+      const breakTime = effectiveBreakTime(block);
       if (breakTime <= 0) return;
       miningProgress += dt / breakTime;
       if (miningProgress >= 1) {
@@ -25943,11 +25941,40 @@ void main() {
       if (!currentTarget) return false;
       const block = getBlock(world, currentTarget.block);
       if (block === "air") return false;
-      const drop = dropForBlock(block);
+      const drop = canHarvest(block) ? dropForBlock(block) : null;
       setBlock(world, currentTarget.block, "air");
       if (drop) addItem(inventory, drop);
       playCue("break");
       rebuildChunkFor(currentTarget.block);
+      return true;
+    }
+    function craftWithWorld(recipe) {
+      return craft(inventory, recipe, hasPlacedCraftingTable());
+    }
+    function hasPlacedCraftingTable() {
+      for (let x = Math.floor(player.position.x) - 4; x <= Math.floor(player.position.x) + 4; x += 1) {
+        for (let y = Math.floor(player.position.y) - 2; y <= Math.floor(player.position.y) + 3; y += 1) {
+          for (let z = Math.floor(player.position.z) - 4; z <= Math.floor(player.position.z) + 4; z += 1) {
+            if (getBlock(world, { x, y, z }) === "craftingTable") return true;
+          }
+        }
+      }
+      return false;
+    }
+    function selectedItem() {
+      return inventory.hotbar[inventory.selected] ?? null;
+    }
+    function effectiveBreakTime(block) {
+      const base = BLOCKS[block].breakTime;
+      const item = selectedItem();
+      if ((block === "stone" || block === "coalOre") && item === "stonePickaxe") return base * 0.38;
+      if ((block === "stone" || block === "coalOre") && item === "woodPickaxe") return base * 0.62;
+      if (block === "stone" || block === "coalOre") return base * 3.5;
+      return base;
+    }
+    function canHarvest(block) {
+      const item = selectedItem();
+      if (block === "stone" || block === "coalOre") return item === "woodPickaxe" || item === "stonePickaxe";
       return true;
     }
     function placeSelected() {
@@ -26004,6 +26031,13 @@ void main() {
       oscillator.start();
       oscillator.stop(audioContext.currentTime + 0.14);
     }
+    function respawnPlayer() {
+      player.position = respawnPosition(world);
+      player.velocityY = 0;
+      player.health = 20;
+      survival.respawns += 1;
+      playCue("respawn");
+    }
   }
   function createChunkObject(world, chunkX, chunkZ) {
     const data = buildChunkMesh(world, chunkX, chunkZ);
@@ -26043,12 +26077,12 @@ void main() {
       return `<li class="hotbar-slot${active}"><span>${index + 1}</span><strong>${item}</strong><em>${inventory.counts[item]}</em></li>`;
     }).join("");
   }
-  function renderRecipes(host, inventory) {
+  function renderRecipes(host, inventory, hasCraftingTable) {
     if (!host) return;
     host.innerHTML = RECIPES.map((recipe) => {
-      const affordable = canCraft(inventory, recipe.id);
+      const affordable = canCraft(inventory, recipe.id, hasCraftingTable);
       const cost = Object.entries(recipe.inputs).map(([item, amount]) => `${amount} ${item}`).join(", ");
-      return `<button class="recipe" data-affordable="${affordable}" disabled>${recipe.label}<span>${cost}</span></button>`;
+      return `<button class="recipe" data-recipe="${recipe.id}" data-affordable="${affordable}">${recipe.label}<span>${cost}</span></button>`;
     }).join("");
   }
   function chunkKey(chunkX, chunkZ) {
