@@ -1,6 +1,6 @@
-# Voxel Survival Sandbox
+# Blockstead
 
-This browser-first voxel survival sandbox is inspired by the first-night loop of Minecraft. Its domain language centers on editable terrain, player-made shelter, lightweight survival pressure, crafting, and persistent world changes.
+Blockstead is a browser-first voxel survival sandbox inspired by the first-night loop of Minecraft. Its domain language centers on editable terrain, player-made shelter, lightweight survival pressure, crafting, and persistent world changes.
 
 ## Language
 
@@ -8,9 +8,17 @@ This browser-first voxel survival sandbox is inspired by the first-night loop of
 The initial survival arc where the player spawns, gathers wood, crafts basic tools, shapes terrain, builds a shelter, lights it, survives night pressure, and reloads into the same altered world.
 _Avoid_: Tutorial loop, starter mission
 
+**Slice**:
+An independently playable implementation stage that proves one part of the First-Night Loop without depending on unfinished later systems.
+_Avoid_: Phase, milestone, sprint
+
 **Voxel World**:
 The editable block environment the player inhabits, mines, places into, saves, and reloads.
 _Avoid_: Map, level, scene
+
+**Starter Valley**:
+The bounded initial Voxel World shape with hills, trees, exposed stone, coal pockets, and a cave mouth.
+_Avoid_: Spawn area, tutorial map, first biome
 
 **Chunk**:
 A bounded region of the Voxel World used to organize terrain, block edits, persistence, and rendering.
@@ -28,6 +36,10 @@ _Avoid_: Survival mode, combat mode
 A lightweight hostile pressure that makes exposed nighttime play risky and gives shelters practical value.
 _Avoid_: Mob system, enemy AI
 
+**Shadow Pressure**:
+The first Night Threat: darkness and exposure drain player health unless the player is protected by torchlight or sufficient shelter.
+_Avoid_: Monster attack, darkness damage
+
 **Shelter**:
 A player-built enclosed or protected space that helps the player survive night pressure.
 _Avoid_: Base, house, fort
@@ -39,6 +51,10 @@ _Avoid_: Material node, gatherable
 **Crafting Table**:
 A placed utility block that unlocks the first meaningful recipe expansion beyond inventory-only crafting.
 _Avoid_: Workbench, maker block
+
+**Recipe List**:
+The MVP crafting interface where available recipes are selected directly from known inputs rather than assembled in a spatial crafting grid.
+_Avoid_: Crafting grid, recipe book
 
 **Torch**:
 A placed light source used to make darkness legible and support safe shelter during the night.
