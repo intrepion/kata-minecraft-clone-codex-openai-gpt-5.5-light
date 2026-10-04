@@ -7,7 +7,7 @@ test("Slice 1 boots a rendered Starter Valley with movement and target face", as
   });
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page.locator("canvas")).toBeVisible();
   await expect.poll(async () => page.evaluate(() => window.__blockstead?.snapshot().renderedVertices ?? 0)).toBeGreaterThan(1000);
 

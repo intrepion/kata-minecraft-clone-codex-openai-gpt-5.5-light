@@ -5,16 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --base ./",
+    "build:file": "npm run build && node scripts/build-file.mjs",
     "test": "vitest run",
     "test:browser": "playwright test",
-    "check": "npm run test && npm run build && npm run test:browser"
+    "check": "npm run test && npm run build:file && npm run test:browser"
   },
   "dependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
+    "@types/node": "^26.6.4",
     "@types/three": "^0.186.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",

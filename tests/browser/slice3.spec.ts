@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Slice 3 crafts resource progression recipes and shows unaffordable state", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect(page.locator("#recipes")).toContainText("Wood Pickaxe");
 
   const cannotCraftPick = await page.evaluate(() => window.__blockstead?.canCraft("woodPickaxe"));

@@ -7,7 +7,7 @@ test("Slice 2 mines and places blocks with visible world edits", async ({ page }
   });
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto("/");
+  await page.goto("/app.html");
   await expect.poll(async () => page.evaluate(() => window.__blockstead?.snapshot().target !== null)).toBe(true);
 
   const target = await page.evaluate(() => window.__blockstead?.snapshot().target);

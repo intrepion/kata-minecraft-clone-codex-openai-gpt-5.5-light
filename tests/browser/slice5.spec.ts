@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Slice 5 reloads player, inventory, time, and Block Edits from Local World Save", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
   await page.evaluate(() => window.__blockstead?.clearSave());
   await page.reload();
 

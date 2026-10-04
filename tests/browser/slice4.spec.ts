@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("Slice 4 applies Shadow Pressure, protection, and Respawn", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app.html");
 
   await page.evaluate(() => {
     window.__blockstead?.setPlayerPosition({ x: 0.5, y: 14, z: 0.5 });
