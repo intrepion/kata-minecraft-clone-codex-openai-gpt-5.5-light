@@ -1,6 +1,16 @@
 import * as THREE from "three";
 import "./styles.css";
-import { makeStarterWorld, findSpawn } from "./domain/world";
+import { makeStarterWorld, findSpawn, getBlock, setBlock, type BlockPos } from "./domain/world";
+import { BLOCKS, type BlockId } from "./domain/blocks";
+import {
+  addItem,
+  blockForItem,
+  consumeSelected,
+  dropForBlock,
+  makeInventory,
+  type Inventory,
+  type ItemId
+} from "./domain/inventory";
 import { buildChunkMesh } from "./render/chunkMesh";
 import { makePlayer, updatePlayer, type InputState } from "./game/player";
 import { raycastBlock, type TargetHit } from "./game/targeting";
@@ -9,6 +19,8 @@ export type BlocksteadSnapshot = {
   player: { x: number; y: number; z: number; health: number };
   target: TargetHit | null;
   renderedVertices: number;
+  inventory: Inventory;
+  targetBlock: BlockId | null;
 };
 
 export function mountBlockstead(root: HTMLElement): void {
@@ -20,11 +32,13 @@ export function mountBlockstead(root: HTMLElement): void {
           <dl class="stats">
             <div>Health <strong id="health">20</strong></div>
             <div>Target <strong id="target">none</strong></div>
+            <div>Mining <strong id="mining">idle</strong></div>
             <div>Mode <strong>Slice 1</strong></div>
           </dl>
         </section>
+        <ol id="hotbar" class="hotbar" aria-label="Hotbar"></ol>
         <div class="crosshair" aria-hidden="true"></div>
-        <div class="prompt">Click to lock pointer. WASD move, Space jump.</div>
+        <div class="prompt">Click to lock pointer. WASD move, Space jump. Hold left mine, right place.</div>
       </div>
     </main>
   `;
@@ -32,8 +46,11 @@ export function mountBlockstead(root: HTMLElement): void {
   if (!host) throw new Error("Missing game host");
 
   const world = makeStarterWorld(4109);
+  const inventory = makeInventory();
+  addItem(inventory, "dirt", 4);
   const player = makePlayer(findSpawn(world));
   const input: InputState = { forward: false, backward: false, left: false, right: false, jump: false };
+  const pointer = { mining: false };
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fc6dd);
   scene.fog = new THREE.Fog(0x9fc6dd, 28, 90);
@@ -49,10 +66,12 @@ export function mountBlockstead(root: HTMLElement): void {
   scene.add(sun);
 
   let renderedVertices = 0;
+  const chunkMeshes = new Map<string, THREE.Mesh>();
   for (let chunkX = -2; chunkX <= 1; chunkX += 1) {
     for (let chunkZ = -2; chunkZ <= 1; chunkZ += 1) {
       const mesh = createChunkObject(world, chunkX, chunkZ);
       renderedVertices += mesh.geometry.getAttribute("position").count;
+      chunkMeshes.set(chunkKey(chunkX, chunkZ), mesh);
       scene.add(mesh);
     }
   }
@@ -63,11 +82,27 @@ export function mountBlockstead(root: HTMLElement): void {
 
   const health = root.querySelector<HTMLElement>("#health");
   const target = root.querySelector<HTMLElement>("#target");
+  const mining = root.querySelector<HTMLElement>("#mining");
+  const hotbar = root.querySelector<HTMLElement>("#hotbar");
   let last = performance.now();
   let currentTarget: TargetHit | null = null;
+  let miningProgress = 0;
+  let miningBlockKey: string | null = null;
 
   host.addEventListener("click", () => {
     renderer.domElement.requestPointerLock().catch(() => undefined);
+  });
+  host.addEventListener("contextmenu", (event) => event.preventDefault());
+  host.addEventListener("mousedown", (event) => {
+    if (event.button === 0) pointer.mining = true;
+    if (event.button === 2) placeSelected();
+  });
+  window.addEventListener("mouseup", (event) => {
+    if (event.button === 0) {
+      pointer.mining = false;
+      miningProgress = 0;
+      miningBlockKey = null;
+    }
   });
   document.addEventListener("pointerlockchange", () => {
     document.body.classList.toggle("locked", document.pointerLockElement === renderer.domElement);
@@ -96,12 +131,15 @@ export function mountBlockstead(root: HTMLElement): void {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     currentTarget = raycastBlock(world, camera.position, dir, 5);
     updateTargetBox(targetBox, currentTarget);
+    tickMining(dt);
     if (health) health.textContent = String(player.health);
     if (target) {
       target.textContent = currentTarget
         ? `${currentTarget.block.x},${currentTarget.block.y},${currentTarget.block.z}`
         : "none";
     }
+    if (mining) mining.textContent = miningProgress > 0 ? `${Math.round(miningProgress * 100)}%` : "idle";
+    renderHotbar(hotbar, inventory);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -111,9 +149,93 @@ export function mountBlockstead(root: HTMLElement): void {
     snapshot: () => ({
       player: { ...player.position, health: player.health },
       target: currentTarget,
-      renderedVertices
-    })
+      renderedVertices,
+      inventory: structuredClone(inventory),
+      targetBlock: currentTarget ? getBlock(world, currentTarget.block) : null
+    }),
+    mineTarget,
+    placeSelected,
+    give: (item: ItemId, amount = 1) => addItem(inventory, item, amount),
+    selectHotbar: (slot: number) => {
+      inventory.selected = Math.max(0, Math.min(inventory.hotbar.length - 1, slot));
+    },
+    blockAt: (pos: BlockPos) => getBlock(world, pos),
+    placeAt: (pos: BlockPos) => placeSelectedAt(pos)
   };
+
+  function tickMining(dt: number): void {
+    if (!pointer.mining || !currentTarget) {
+      miningProgress = 0;
+      miningBlockKey = null;
+      return;
+    }
+    const key = `${currentTarget.block.x},${currentTarget.block.y},${currentTarget.block.z}`;
+    if (miningBlockKey !== key) {
+      miningBlockKey = key;
+      miningProgress = 0;
+    }
+    const block = getBlock(world, currentTarget.block);
+    const breakTime = BLOCKS[block].breakTime;
+    if (breakTime <= 0) return;
+    miningProgress += dt / breakTime;
+    if (miningProgress >= 1) {
+      mineTarget();
+      miningProgress = 0;
+      miningBlockKey = null;
+    }
+  }
+
+  function mineTarget(): boolean {
+    if (!currentTarget) return false;
+    const block = getBlock(world, currentTarget.block);
+    if (block === "air") return false;
+    const drop = dropForBlock(block);
+    setBlock(world, currentTarget.block, "air");
+    if (drop) addItem(inventory, drop);
+    rebuildChunkFor(currentTarget.block);
+    return true;
+  }
+
+  function placeSelected(): boolean {
+    if (!currentTarget) return false;
+    return placeSelectedAt(currentTarget.face);
+  }
+
+  function placeSelectedAt(pos: BlockPos): boolean {
+    const item = consumeSelected(inventory);
+    if (!item) return false;
+    const block = blockForItem(item);
+    if (!block) {
+      addItem(inventory, item);
+      return false;
+    }
+    setBlock(world, pos, block);
+    rebuildChunkFor(pos);
+    return true;
+  }
+
+  function rebuildChunkFor(pos: BlockPos): void {
+    const chunkX = Math.floor(pos.x / 16);
+    const chunkZ = Math.floor(pos.z / 16);
+    const key = chunkKey(chunkX, chunkZ);
+    const old = chunkMeshes.get(key);
+    if (old) {
+      scene.remove(old);
+      old.geometry.dispose();
+      if (Array.isArray(old.material)) {
+        old.material.forEach((material) => material.dispose());
+      } else {
+        old.material.dispose();
+      }
+    }
+    const mesh = createChunkObject(world, chunkX, chunkZ);
+    chunkMeshes.set(key, mesh);
+    scene.add(mesh);
+    renderedVertices = Array.from(chunkMeshes.values()).reduce(
+      (total, chunk) => total + chunk.geometry.getAttribute("position").count,
+      0
+    );
+  }
 }
 
 function createChunkObject(world: ReturnType<typeof makeStarterWorld>, chunkX: number, chunkZ: number): THREE.Mesh {
@@ -134,6 +256,10 @@ function setKey(input: InputState, code: string, pressed: boolean): void {
   if (code === "KeyA") input.left = pressed;
   if (code === "KeyD") input.right = pressed;
   if (code === "Space") input.jump = pressed;
+  if (/^Digit[1-5]$/.test(code) && pressed) {
+    const slot = Number(code.replace("Digit", "")) - 1;
+    window.__blockstead?.selectHotbar(slot);
+  }
 }
 
 function updateTargetBox(helper: THREE.Box3Helper, target: TargetHit | null): void {
@@ -144,4 +270,18 @@ function updateTargetBox(helper: THREE.Box3Helper, target: TargetHit | null): vo
   helper.visible = true;
   helper.box.min.set(target.block.x, target.block.y, target.block.z);
   helper.box.max.set(target.block.x + 1, target.block.y + 1, target.block.z + 1);
+}
+
+function renderHotbar(host: HTMLElement | null, inventory: Inventory): void {
+  if (!host) return;
+  host.innerHTML = inventory.hotbar
+    .map((item, index) => {
+      const active = index === inventory.selected ? " active" : "";
+      return `<li class="hotbar-slot${active}"><span>${index + 1}</span><strong>${item}</strong><em>${inventory.counts[item]}</em></li>`;
+    })
+    .join("");
+}
+
+function chunkKey(chunkX: number, chunkZ: number): string {
+  return `${chunkX},${chunkZ}`;
 }

@@ -19,6 +19,7 @@ test("Slice 1 boots a rendered Starter Valley with movement and target face", as
 
   expect(after?.z).not.toBe(before?.z);
   await expect.poll(async () => page.evaluate(() => window.__blockstead?.snapshot().target !== null)).toBe(true);
+  await expect(page.locator("#hotbar")).toContainText("dirt");
 
   const screenshot = await page.screenshot();
   expect(screenshot.length).toBeGreaterThan(10_000);
