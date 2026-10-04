@@ -24,6 +24,10 @@ _Avoid_: Spawn area, tutorial map, first biome
 A bounded region of the Voxel World used to organize terrain, block edits, persistence, and rendering.
 _Avoid_: Region, tile group, sector
 
+**Chunk Mesh**:
+The rendered surface geometry generated from visible block faces within a Chunk.
+_Avoid_: Block mesh, terrain mesh
+
 **Block Edit**:
 A persistent player change to the Voxel World caused by mining or placing a block.
 _Avoid_: Terrain mutation, voxel delta
@@ -99,6 +103,10 @@ _Avoid_: Light, lamp
 **Day Cycle**:
 The repeating daylight-to-night rhythm that controls visibility and when Shadow Pressure becomes dangerous.
 _Avoid_: Time system, clock
+
+**Cue**:
+A short generated sound that confirms an important player action or survival event.
+_Avoid_: Sound effect, audio asset
 
 **Respawn**:
 The MVP recovery after health reaches zero, returning the player to the Starter Valley spawn while retaining inventory.
