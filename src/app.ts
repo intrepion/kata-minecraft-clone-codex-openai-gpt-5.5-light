@@ -15,6 +15,14 @@ import {
   type ItemId,
   type RecipeId
 } from "./domain/inventory";
+import {
+  advanceDayCycle,
+  applyShadowPressure,
+  isNight,
+  isProtected,
+  makeSurvivalState,
+  respawnPosition
+} from "./domain/survival";
 import { buildChunkMesh } from "./render/chunkMesh";
 import { makePlayer, updatePlayer, type InputState } from "./game/player";
 import { raycastBlock, type TargetHit } from "./game/targeting";
@@ -25,6 +33,7 @@ export type BlocksteadSnapshot = {
   renderedVertices: number;
   inventory: Inventory;
   targetBlock: BlockId | null;
+  survival: { timeOfDay: number; night: boolean; protected: boolean; cue: string | null; respawns: number };
 };
 
 export function mountBlockstead(root: HTMLElement): void {
@@ -37,6 +46,8 @@ export function mountBlockstead(root: HTMLElement): void {
             <div>Health <strong id="health">20</strong></div>
             <div>Target <strong id="target">none</strong></div>
             <div>Mining <strong id="mining">idle</strong></div>
+            <div>Time <strong id="time">day</strong></div>
+            <div>Protection <strong id="protection">exposed</strong></div>
             <div>Mode <strong>Slice 1</strong></div>
           </dl>
         </section>
@@ -55,6 +66,7 @@ export function mountBlockstead(root: HTMLElement): void {
 
   const world = makeStarterWorld(4109);
   const inventory = makeInventory();
+  const survival = makeSurvivalState();
   addItem(inventory, "dirt", 4);
   const player = makePlayer(findSpawn(world));
   const input: InputState = { forward: false, backward: false, left: false, right: false, jump: false };
@@ -91,15 +103,19 @@ export function mountBlockstead(root: HTMLElement): void {
   const health = root.querySelector<HTMLElement>("#health");
   const target = root.querySelector<HTMLElement>("#target");
   const mining = root.querySelector<HTMLElement>("#mining");
+  const time = root.querySelector<HTMLElement>("#time");
+  const protection = root.querySelector<HTMLElement>("#protection");
   const hotbar = root.querySelector<HTMLElement>("#hotbar");
   const recipes = root.querySelector<HTMLElement>("#recipes");
   let last = performance.now();
   let currentTarget: TargetHit | null = null;
   let miningProgress = 0;
   let miningBlockKey: string | null = null;
+  let audioContext: AudioContext | null = null;
 
   host.addEventListener("click", () => {
     renderer.domElement.requestPointerLock().catch(() => undefined);
+    audioContext ??= new AudioContext();
   });
   host.addEventListener("contextmenu", (event) => event.preventDefault());
   host.addEventListener("mousedown", (event) => {
@@ -133,6 +149,17 @@ export function mountBlockstead(root: HTMLElement): void {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     updatePlayer(world, player, input, dt);
+    advanceDayCycle(survival, dt);
+    const nextHealth = applyShadowPressure(world, player.position, player.health, survival.timeOfDay, dt);
+    if (nextHealth < player.health) playCue("damage");
+    player.health = nextHealth;
+    if (player.health <= 0) {
+      player.position = respawnPosition(world);
+      player.velocityY = 0;
+      player.health = 20;
+      survival.respawns += 1;
+      playCue("respawn");
+    }
     camera.position.set(player.position.x, player.position.y + 1.62, player.position.z);
     camera.rotation.order = "YXZ";
     camera.rotation.y = player.yaw;
@@ -148,6 +175,8 @@ export function mountBlockstead(root: HTMLElement): void {
         : "none";
     }
     if (mining) mining.textContent = miningProgress > 0 ? `${Math.round(miningProgress * 100)}%` : "idle";
+    if (time) time.textContent = isNight(survival.timeOfDay) ? "night" : "day";
+    if (protection) protection.textContent = isProtected(world, player.position) ? "protected" : "exposed";
     renderHotbar(hotbar, inventory);
     renderRecipes(recipes, inventory);
     renderer.render(scene, camera);
@@ -161,13 +190,40 @@ export function mountBlockstead(root: HTMLElement): void {
       target: currentTarget,
       renderedVertices,
       inventory: structuredClone(inventory),
-      targetBlock: currentTarget ? getBlock(world, currentTarget.block) : null
+      targetBlock: currentTarget ? getBlock(world, currentTarget.block) : null,
+      survival: {
+        timeOfDay: survival.timeOfDay,
+        night: isNight(survival.timeOfDay),
+        protected: isProtected(world, player.position),
+        cue: survival.lastCue,
+        respawns: survival.respawns
+      }
     }),
     mineTarget,
     placeSelected,
     give: (item: ItemId, amount = 1) => addItem(inventory, item, amount),
     craft: (recipe: RecipeId) => craft(inventory, recipe),
     canCraft: (recipe: RecipeId) => canCraft(inventory, recipe),
+    setTimeOfDay: (timeOfDay: number) => {
+      survival.timeOfDay = ((timeOfDay % 1) + 1) % 1;
+    },
+    setHealth: (health: number) => {
+      player.health = Math.max(0, health);
+    },
+    setPlayerPosition: (position: { x: number; y: number; z: number }) => {
+      player.position = position;
+      player.velocityY = 0;
+    },
+    tickSurvival: (dt: number) => {
+      advanceDayCycle(survival, dt);
+      player.health = applyShadowPressure(world, player.position, player.health, survival.timeOfDay, dt);
+      if (player.health <= 0) {
+        player.position = respawnPosition(world);
+        player.health = 20;
+        survival.respawns += 1;
+        playCue("respawn");
+      }
+    },
     selectHotbar: (slot: number) => {
       inventory.selected = Math.max(0, Math.min(inventory.hotbar.length - 1, slot));
     },
@@ -204,6 +260,7 @@ export function mountBlockstead(root: HTMLElement): void {
     const drop = dropForBlock(block);
     setBlock(world, currentTarget.block, "air");
     if (drop) addItem(inventory, drop);
+    playCue("break");
     rebuildChunkFor(currentTarget.block);
     return true;
   }
@@ -222,6 +279,7 @@ export function mountBlockstead(root: HTMLElement): void {
       return false;
     }
     setBlock(world, pos, block);
+    playCue(block === "torch" ? "torch" : "place");
     rebuildChunkFor(pos);
     return true;
   }
@@ -247,6 +305,22 @@ export function mountBlockstead(root: HTMLElement): void {
       (total, chunk) => total + chunk.geometry.getAttribute("position").count,
       0
     );
+  }
+
+  function playCue(cue: string): void {
+    survival.lastCue = cue;
+    if (!audioContext) return;
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const frequency = cue === "damage" ? 120 : cue === "respawn" ? 260 : cue === "torch" ? 520 : 360;
+    oscillator.frequency.value = frequency;
+    oscillator.type = "triangle";
+    gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.12);
+    oscillator.connect(gain).connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.14);
   }
 }
 

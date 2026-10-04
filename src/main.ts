@@ -9,6 +9,10 @@ declare global {
       give: (item: import("./domain/inventory").ItemId, amount?: number) => void;
       craft: (recipe: import("./domain/inventory").RecipeId) => boolean;
       canCraft: (recipe: import("./domain/inventory").RecipeId) => boolean;
+      setTimeOfDay: (timeOfDay: number) => void;
+      setHealth: (health: number) => void;
+      setPlayerPosition: (position: { x: number; y: number; z: number }) => void;
+      tickSurvival: (dt: number) => void;
       selectHotbar: (slot: number) => void;
       blockAt: (pos: import("./domain/world").BlockPos) => import("./domain/blocks").BlockId;
       placeAt: (pos: import("./domain/world").BlockPos) => boolean;
