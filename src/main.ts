@@ -7,6 +7,8 @@ declare global {
       mineTarget: () => boolean;
       placeSelected: () => boolean;
       give: (item: import("./domain/inventory").ItemId, amount?: number) => void;
+      craft: (recipe: import("./domain/inventory").RecipeId) => boolean;
+      canCraft: (recipe: import("./domain/inventory").RecipeId) => boolean;
       selectHotbar: (slot: number) => void;
       blockAt: (pos: import("./domain/world").BlockPos) => import("./domain/blocks").BlockId;
       placeAt: (pos: import("./domain/world").BlockPos) => boolean;

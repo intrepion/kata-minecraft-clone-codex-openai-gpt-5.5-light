@@ -5,11 +5,15 @@ import { BLOCKS, type BlockId } from "./domain/blocks";
 import {
   addItem,
   blockForItem,
+  canCraft,
   consumeSelected,
+  craft,
   dropForBlock,
   makeInventory,
+  RECIPES,
   type Inventory,
-  type ItemId
+  type ItemId,
+  type RecipeId
 } from "./domain/inventory";
 import { buildChunkMesh } from "./render/chunkMesh";
 import { makePlayer, updatePlayer, type InputState } from "./game/player";
@@ -35,6 +39,10 @@ export function mountBlockstead(root: HTMLElement): void {
             <div>Mining <strong id="mining">idle</strong></div>
             <div>Mode <strong>Slice 1</strong></div>
           </dl>
+        </section>
+        <section class="recipes">
+          <h2>Recipes</h2>
+          <div id="recipes"></div>
         </section>
         <ol id="hotbar" class="hotbar" aria-label="Hotbar"></ol>
         <div class="crosshair" aria-hidden="true"></div>
@@ -84,6 +92,7 @@ export function mountBlockstead(root: HTMLElement): void {
   const target = root.querySelector<HTMLElement>("#target");
   const mining = root.querySelector<HTMLElement>("#mining");
   const hotbar = root.querySelector<HTMLElement>("#hotbar");
+  const recipes = root.querySelector<HTMLElement>("#recipes");
   let last = performance.now();
   let currentTarget: TargetHit | null = null;
   let miningProgress = 0;
@@ -140,6 +149,7 @@ export function mountBlockstead(root: HTMLElement): void {
     }
     if (mining) mining.textContent = miningProgress > 0 ? `${Math.round(miningProgress * 100)}%` : "idle";
     renderHotbar(hotbar, inventory);
+    renderRecipes(recipes, inventory);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -156,6 +166,8 @@ export function mountBlockstead(root: HTMLElement): void {
     mineTarget,
     placeSelected,
     give: (item: ItemId, amount = 1) => addItem(inventory, item, amount),
+    craft: (recipe: RecipeId) => craft(inventory, recipe),
+    canCraft: (recipe: RecipeId) => canCraft(inventory, recipe),
     selectHotbar: (slot: number) => {
       inventory.selected = Math.max(0, Math.min(inventory.hotbar.length - 1, slot));
     },
@@ -280,6 +292,17 @@ function renderHotbar(host: HTMLElement | null, inventory: Inventory): void {
       return `<li class="hotbar-slot${active}"><span>${index + 1}</span><strong>${item}</strong><em>${inventory.counts[item]}</em></li>`;
     })
     .join("");
+}
+
+function renderRecipes(host: HTMLElement | null, inventory: Inventory): void {
+  if (!host) return;
+  host.innerHTML = RECIPES.map((recipe) => {
+    const affordable = canCraft(inventory, recipe.id);
+    const cost = Object.entries(recipe.inputs)
+      .map(([item, amount]) => `${amount} ${item}`)
+      .join(", ");
+    return `<button class="recipe" data-affordable="${affordable}" disabled>${recipe.label}<span>${cost}</span></button>`;
+  }).join("");
 }
 
 function chunkKey(chunkX: number, chunkZ: number): string {

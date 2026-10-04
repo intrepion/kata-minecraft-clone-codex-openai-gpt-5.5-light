@@ -77,6 +77,48 @@ canvas {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
 }
 
+.recipes {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 240px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 14, 12, 0.68);
+  backdrop-filter: blur(10px);
+}
+
+.recipes h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.recipe {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 241, 223, 0.92);
+  text-align: left;
+}
+
+.recipe[data-affordable="false"] {
+  color: rgba(245, 241, 223, 0.42);
+}
+
+.recipe span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .title {
   margin: 0 0 8px;
   font-size: 18px;
