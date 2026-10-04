@@ -25651,7 +25651,7 @@ void main() {
   }
   function updatePlayer(world, player, input, dt) {
     const speed = 5.2;
-    const forward = new Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+    const forward = new Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
     const right = new Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
     const wish = new Vector3();
     if (input.forward) wish.add(forward);

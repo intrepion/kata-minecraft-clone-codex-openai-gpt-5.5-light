@@ -33,7 +33,7 @@ export function makePlayer(position: Vec3): PlayerState {
 
 export function updatePlayer(world: StarterWorld, player: PlayerState, input: InputState, dt: number): void {
   const speed = 5.2;
-  const forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+  const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
   const wish = new THREE.Vector3();
   if (input.forward) wish.add(forward);
