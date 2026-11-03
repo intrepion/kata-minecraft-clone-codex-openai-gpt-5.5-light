@@ -26,3 +26,7 @@ npm run check
 ```
 
 The check runs Vitest domain tests, a production build, direct-file bundle generation, and Playwright browser acceptances for every MVP Slice.
+
+## Play online
+
+[Play on GitHub Pages](https://intrepion.github.io/kata-minecraft-clone-codex-openai-gpt-5.5-light/). Return to the [Kata Arcade](https://intrepion.github.io/).
