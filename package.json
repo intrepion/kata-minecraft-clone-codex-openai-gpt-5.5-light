@@ -12,12 +12,13 @@
     "check": "npm run test && npm run build:file && npm run test:browser"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "@types/node": "^26.6.4",
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.187.0",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.1.0"
